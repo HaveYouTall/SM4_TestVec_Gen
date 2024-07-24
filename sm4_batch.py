@@ -6,7 +6,6 @@
 import os
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 from cryptography.hazmat.primitives import padding
-# import sys
 import codecs
 
 import CFB as CFB
@@ -97,7 +96,6 @@ def read_config(file_path):
 	current_config = {}
 	for line in lines:
 		line = line.replace(" ", "")
-		# line = line.strip()
 		line = line.split('#')[0].strip()
 		if not line:
 			if current_config:
@@ -114,13 +112,11 @@ def read_config(file_path):
 	return config_list
 
 
-def cipher_core(cipher, message, padder, unpadder):
+def cipher_core_once(cipher, message, padder, unpadder):
 
 	pad_flag = False
 
 	encryptor = cipher.encryptor()
-
-	# str=padder.update(message.encode())+padder.finalize()
 	
 	# Do not pad if message already fit in several blocks. 
 	if len(message) % 16 != 0:
@@ -131,60 +127,32 @@ def cipher_core(cipher, message, padder, unpadder):
 	else:
 		pad_msg = message
 
-	# pad_msg=padder.update(message)+padder.finalize()
 
 	ciphertext = encryptor.update(pad_msg) + encryptor.finalize()
 
 	# Now decrypt
-
 	decryptor = cipher.decryptor()
 
 	if pad_flag:
 		rtn = unpadder.update(decryptor.update(ciphertext) + decryptor.finalize())+unpadder.finalize()
 	else:
 		rtn = decryptor.update(ciphertext) + decryptor.finalize()
-	
-	# rtn = unpadder.update(decryptor.update(ciphertext) + decryptor.finalize())+unpadder.finalize()
-
 
 	return ciphertext, rtn, pad_msg
 
-
-# def cipher_core_update(cipher, message, padder):
 # Encryptor should keep the same when perform one stream encrypt.
-# def cipher_core_update(encryptor, message, padder):
 def cipher_core_update(encryptor, message):
-
-	# pad_flag = False
-
-	# encryptor = cipher.encryptor()
-
-	# str=padder.update(message.encode())+padder.finalize()
-	
-	# Do not pad if message already fit in several blocks. 
-	# if len(message) % 16 != 0:
-	# 	pad_flag = True
-	
-	# if pad_flag:
-	# 	pad_msg=padder.update(message)+padder.finalize()
-	# else:
-	# 	pad_msg = message
+	# No pad message
 	pad_msg = message
-
-	# pad_msg=padder.update(message)+padder.finalize()
 
 	ciphertext = encryptor.update(pad_msg)
 
 	return ciphertext
 
 def cipher_core_finalize(encryptor):
-	# encryptor = cipher.encryptor()
 	return encryptor.finalize()
 
 def do_sm4(message, key=None, iv=None, mode=0):
-
-	# keysize=16
-	# mode=0
 
 	if iv is None:
 		iv = os.urandom(16)
@@ -211,7 +179,7 @@ def do_sm4(message, key=None, iv=None, mode=0):
 		cipher = Cipher(algorithms.SM4(key), modes.ECB())
 		
 	if cipher is not None:
-		ciphertext, rtn, pad_msg = cipher_core(cipher, message, padder, unpadder)
+		ciphertext, rtn, pad_msg = cipher_core_once(cipher, message, padder, unpadder)
 			
 		print("Type:\t\t\t",cipher.algorithm.name)
 		print("Mode:\t\t\t",cipher.mode.name)
@@ -221,8 +189,6 @@ def do_sm4(message, key=None, iv=None, mode=0):
 		print("\nKey:\t\t\t",key.hex())
 		if (mode!=4): print("IV:\t\t\t",iv.hex())
 		print("\nCipher:\t\t\t",ciphertext.hex())
-		# print("Decrypt:\t\t",rtn.decode())
-		# print("Decrypt:\t\t",bytes_to_hex(rtn))
 		print("Decrypt:\t\t",rtn.hex())
 
 		if rtn != message:
@@ -249,18 +215,15 @@ def do_ecb_mont_test(message, key):
 		print(f"KEY[{i}] = {Key.hex()}")
 		print(f"PLAINTEXT = {PT.hex()}")
 		cipher = Cipher(algorithms.SM4(Key), modes.ECB())
-		# cipher = Cipher(algorithms.AES128(Key), modes.ECB())
 		CT = []
 		for j in range(1000):
 			padder = padding.PKCS7(128).padder()
 			unpadder = padding.PKCS7(128).unpadder()
-			ct_j, _, _ = cipher_core(cipher, PT, padder, unpadder)
+			ct_j, _, _ = cipher_core_once(cipher, PT, padder, unpadder)
 			CT.append(ct_j)
 			PT = ct_j
-			# print(f"CT[{j}]: {ct_j.hex()}")
+
 		Key = bytes(a ^ b for a, b in zip(Key, CT[-1]))
-			# cipher = Cipher(algorithms.SM4(Key), modes.ECB())
-			
 		print(f"CIPHERTEXT = {CT[-1].hex()}\n")
 		PT = CT[-1]
 	return
@@ -269,28 +232,20 @@ def do_cbc_mont_test(message, key, iv):
 	PT = message
 	Key = key
 	IV = iv
-	# print(f"Key[{i}] = {Key.hex()}")
-	# print(f"PLAINTEXT = {PT.hex()}")
+
 	for i in range(100):
 		print(f"KEY[{i}] = {Key.hex()}")
 		print(f"IV[{i}] = {IV.hex()}")
 		print(f"PLAINTEXT = {PT.hex()}")
 
-		# padder = padding.PKCS7(128).padder()
-		# unpadder = padding.PKCS7(128).unpadder()
 		cipher = Cipher(algorithms.SM4(Key), modes.CBC(IV))
 		encryptor = cipher.encryptor()
 		CT = []
 		for j in range(1000):
-			# ct_j = cipher_core_update(encryptor, PT, padder)
 			ct_j = cipher_core_update(encryptor, PT)
 			if j == 0:
-				# cipher = Cipher(algorithms.SM4(Key), modes.CBC(IV))
-				# ct_j, _, _ = cipher_core_update(cipher, PT, padder, unpadder)
 				PT = IV
 			else:
-				# cipher = Cipher(algorithms.SM4(Key), modes.ECB())
-				# ct_j, _, _ = cipher_core_update(cipher, PT, padder, unpadder)
 				PT = CT[j-1]
 			CT.append(ct_j)
 		
@@ -306,28 +261,20 @@ def do_ofb_mont_test(message, key, iv):
 	PT = message
 	Key = key
 	IV = iv
-	# print(f"Key[{i}] = {Key.hex()}")
-	# print(f"PLAINTEXT = {PT.hex()}")
+
 	for i in range(100):
 		print(f"KEY[{i}] = {Key.hex()}")
 		print(f"IV[{i}] = {IV.hex()}")
 		print(f"PLAINTEXT = {PT.hex()}")
 
-		# padder = padding.PKCS7(128).padder()
-		# unpadder = padding.PKCS7(128).unpadder()
 		cipher = Cipher(algorithms.SM4(Key), modes.OFB(IV))
 		encryptor = cipher.encryptor()
 		CT = []
 		for j in range(1000):
-			# ct_j = cipher_core_update(encryptor, PT, padder)
 			ct_j = cipher_core_update(encryptor, PT)
 			if j == 0:
-				# cipher = Cipher(algorithms.SM4(Key), modes.CBC(IV))
-				# ct_j, _, _ = cipher_core_update(cipher, PT, padder, unpadder)
 				PT = IV
 			else:
-				# cipher = Cipher(algorithms.SM4(Key), modes.ECB())
-				# ct_j, _, _ = cipher_core_update(cipher, PT, padder, unpadder)
 				PT = CT[j-1]
 			CT.append(ct_j)
 		
@@ -352,30 +299,18 @@ def do_cfb1_mont_test(message, key, iv):
 		cfb1 = CFB.CFB1(IV, encryptor)
 		CT = []
 		for j in range(1000):
-			# ct_j = cipher_core_update(encryptor, PT, padder)
-			# print(f"PT:{PT.hex()}")
-			# ct_j = cipher_core_update(encryptor, PT)
-			# print(f"at j = {j}, PT = {PT}")
 			ct_j = cfb1.update(PT)
-			# print(f"ct_j:{ct_j.hex()}")
-			# print(type(PT), type(ct_j))
 			if j == 0:
-				# print(f"IV[{j}]: {IV[j]}, {type(IV[j])} bytes: {bytes(IV[j])}")
 				PT = [BitJ(IV, j)]
-				# print(f"PT:{PT.hex()}")
 			else:
 				if j < 128:
 					PT = [BitJ(IV, j)]
 				else:
-					# print(CT[j-128])
 					PT = [CT[j-128]]
-			# CT.append(ct_j)
 			CT.extend(ct_j)
 		
 		ct_j += cipher_core_finalize(encryptor)
 		print(f"CIPHERTEXT = {ct_j[0]}\n")
-		# print(type(byte_list_to_bytes(CT[j-15:])), " : ", byte_list_to_bytes(CT[j-15:]))
-		# print(type(Key), " : ", Key.hex())
 
 		Key = bytes(a ^ b for a, b in zip(Key, bit_list_to_bytes(CT[j-127:])))
 		IV = bit_list_to_bytes(CT[j-127:])
@@ -393,7 +328,6 @@ def do_cfb8_mont_test(message, key, iv):
 		print(f"PLAINTEXT = {PT.hex()}")
 
 		# Not support for SM4
-		# cipher = Cipher(algorithms.SM4(Key), modes.CFB8(IV))
 		cipher = Cipher(algorithms.SM4(Key), modes.ECB())
 		encryptor = cipher.encryptor()
 		cfb8 = CFB.CFB8(IV, encryptor)
@@ -432,7 +366,6 @@ def do_cfb128_mont_test(message, key, iv):
 		encryptor = cipher.encryptor()
 		CT = []
 		for j in range(1000):
-			# ct_j = cipher_core_update(encryptor, PT, padder)
 			ct_j = cipher_core_update(encryptor, PT)
 			if j == 0:
 				PT = IV
@@ -484,37 +417,23 @@ def print_mont_test_message(mode, message, key, iv):
 def do_sm4_mont_test(message, key, iv, mode):
 	print_mont_test_message(mode, message, key, iv)
 	if (mode==0): 
-		# cipher = Cipher(algorithms.SM4(key), modes.CBC(iv))
 		do_cbc_mont_test(message, key, iv)
 	if (mode==1): 
-		# cipher = Cipher(algorithms.SM4(key), modes.OFB(iv))
 		do_ofb_mont_test(message, key, iv)
 	if (mode==2): 
-		# cipher = Cipher(algorithms.SM4(key), modes.CFB(iv))
 		do_cfb128_mont_test(message, key, iv)
 	if (mode==5): 
-		# cipher = Cipher(algorithms.SM4(key), modes.CFB8(iv))
 		do_cfb8_mont_test(message, key, iv)
 	if (mode==6):
 		do_cfb1_mont_test(message, key, iv)
 	if (mode==3): 
-		cipher = Cipher(algorithms.SM4(key), modes.CTR(iv))
+		# cipher = Cipher(algorithms.SM4(key), modes.CTR(iv))
+		pass
 	if (mode==4): 
-		# cipher = Cipher(algorithms.SM4(key), modes.ECB())
 		do_ecb_mont_test(message, key)
 
 
 def main():
-	# message="Hello"
-
-	# if (len(sys.argv)>1):
-	# 	message=str(sys.argv[1])
-	# if (len(sys.argv)>2):
-	# 	mode=int(sys.argv[2])
-
-	# if (len(sys.argv)>1):
-	# 	mode=int(sys.argv[1])
-
 	config_file_path = 'config.txt'
 	config = read_config(config_file_path)
 	# print(config)
