@@ -675,7 +675,7 @@ def VarKey(message, key_list, iv, mode, item, count):
 
 
 
-ground_truth = {
+candidate_res = {
 	"KeySbox": [
 		0x24C1211CCEC3D57786B792B5595304E9,
 		0xD5284C4176BCFDDEABAD8A2563A9ABE3,
@@ -961,13 +961,15 @@ ground_truth = {
 	]
 }
 
+# Used to check if candidate res is the same with res we caculate.
+# Then we can claim that if the candidate res is correct.
 def check_res(test_name, res):
-	if test_name not in ground_truth:
-		print("[No Ground Truth]")
+	if test_name not in candidate_res:
+		print(f"[No Candidate Res for {test_name}]")
 	else:
 		for i in range(len(res)):
-			if int(res[i].hex(), 16) != ground_truth[test_name][i]:
-				print(f"At index {i}\n\tres: 0x{res[i].hex()}\n\tground_truth: {hex(ground_truth[test_name][i])}")
+			if int(res[i].hex(), 16) != candidate_res[test_name][i]:
+				print(f"Candidate error. At index {i}\n\tres: 0x{res[i].hex()}\n\tcandidate res: {hex(candidate_res[test_name][i])}")
 
 	print("[Res Check Finish]")
 
